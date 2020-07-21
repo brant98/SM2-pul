@@ -89,17 +89,95 @@ int isInRange(big num) //判断d是否在规定范围内  1至n-1的闭区间
 }
 int SM2_creat_key(big* d, epoint** pub)
 {
-	big temp = mirvar(0);
-	copy(para_n, temp);
+
 	*d = mirvar(0);
 	*pub = epoint_init();
 	irand(time(NULL));
-	bigrand(temp, *d);  // d私钥 d应在1至n-2之间，包括两端
+	bigrand(para_n, *d);  // d私钥 d应在1至n-2之间，包括两端
 	while (isInRange(*d) != 1)
 	{
-		bigrand(temp, *d);
+		bigrand(para_n, *d);
 	}
 	ecurve_mult(*d, G, *pub);//pub中存放公钥
 	printf("creat key done!\n");
 	return 1; //成功返回1
+}
+
+
+/*
+KDF密钥派生函数
+*/
+int KDF(unsigned Z[], int zlen, int klen, unsigned char K[])
+{
+
+
+
+	return 1;//返回1成功
+}
+
+/*
+	功能：用公钥点G(x,y)对消息进行加密
+	输入：pubKey公钥点、message明文、message_len消息长度
+	输出：C密文
+	返回：0成功 !0失败
+*/
+int SM2_encrypt(epoint* pubKey, unsigned char message[], int message_len, unsigned char C[])
+{
+	big k,C1x,C1y,x2,y2;  //k为随机数
+	epoint* C1, * kP, * S;
+	unsigned char x2y2_char[32 * 2] = { 0 };
+	k = mirvar(0);
+	C1x = mirvar(0);
+	C1y = mirvar(0);
+	x2 = mirvar(0);
+	y2 = mirvar(0);
+	C1 = epoint2_init();
+	kP = epoint2_init();
+	S = epoint2_init();
+	
+	//step 1:产生随机数k   在1至n-1的双侧闭区间
+	while (isInRange(k))
+	{
+		bigrand(para_n, k); 
+	}
+	//step 2:计算椭圆曲线点C1 
+	ecurve_mult(k, G, C1);  //C1 = [k]G
+	epoint_get(C1, C1x,C1y);
+	
+	big_to_bytes(32, C1x, C, 1);
+	big_to_bytes(32, C1y, C + 32, 1);
+
+	//step 3：计算曲线点S  并判断是否为无穷远点，若是报错退出。
+	ecurve_mult(para_h, pubKey, S);
+	if (point_at_infinity)
+	{
+		printf("S is not at infinity!\n");
+		return 0;
+	}
+
+	//step 4: 计算[k]PB = (x2, y2)，并将x2,y2转换成比特串
+	ecurve_mult(k, pubKey, kP);  //kP=[k]PB
+	ecurve_get(kP, x2, y2);
+	
+	big_to_bytes(32, x2, x2y2_char, 1);
+	big_to_bytes(32, y2, x2y2_char+32, 1);
+
+	//step 5:
+
+	/* test if the given array is all zero */
+	/*int Test_Null(unsigned char array[], int len)
+	{
+		int i;
+
+		for (i = 0; i < len; i++)
+			if (array[i] != 0x00) return 0;
+
+		return 1;
+	}*/
+
+
+
+
+
+
 }
