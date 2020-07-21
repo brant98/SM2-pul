@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <time.h>
 #include "miracl.h"
+#include"mirdef.h"
+#include "SM2.h"
+
 
 // ECC椭圆曲线参数（SM2标准推荐参数）
 static unsigned char SM2_p[32] = {
@@ -102,15 +105,77 @@ int SM2_creat_key(big* d, epoint** pub)
 	printf("creat key done!\n");
 	return 1; //成功返回1
 }
-
-
 /*
 KDF密钥派生函数
+ key derivation function
+*Z是比特串，klen表示要获得的密钥数据的比特长度
+*k是存放输出的，z是输入
 */
-int KDF(unsigned Z[], int zlen, int klen, unsigned char K[])
+int KDF(unsigned char Z[], int zlen, int klen, unsigned char K[])
 {
+	int  i, j, t;
+	int bit_klen;
+	unsigned char Ha[32];
+	unsigned char ct[4] = { 0,0,0,1 };
+	bit_klen = klen * 8;//有多少位
+	sha256 sha_256;
 
+	if (bit_klen % 32)
+		t = bit_klen / 256 + 1;
+	else
+		t = bit_klen / 256;
+	//K= Ha1 || Ha2 || ...
+	for (i = 1; i < t; i++)//因为后面有i-1
+	{
+		//Ha1=Hv(Z|| ct )
+		shs256_init(&sha_256);
+		for (j = 0; Z[j] != 0; j++)
+			shs256_process(&sha_256, Z[j]);
+		for (j = 0; ct[j] != 0; j++)
+			shs256_process(&sha_256, ct[j]);
+		shs256_hash(&sha_256, Ha);
+		
+		memcpy((K + 32 * (i - 1)), Ha, 32);
 
+		//ct++  注意进位,大小端
+		if (ct[3] == 0xff)
+		{
+			ct[3] = 0;
+			if (ct[2] == 0xff)
+			{
+				ct[2] = 0;
+				if (ct[1] == 0xff)
+				{
+					ct[1] = 0;
+					ct[0]++;
+				}
+				else
+					ct[1]++;
+			}
+			else
+				ct[2]++;
+		}
+		else
+			ct[3]++;
+	}
+	shs256_init(&sha_256);
+	for (j = 0; Z[j] != 0; j++)
+		shs256_process(&sha_256, Z[j]);
+	for (j = 0; ct[j] != 0; j++)
+		shs256_process(&sha_256, ct[j]);
+	shs256_hash(&sha_256, Ha);
+
+	//若klen/v是整数
+	if (bit_klen % 256)
+	{
+		//i = (32 - bit_klen + 32 * (bit_klen / 32)) / 8;
+		j = (bit_klen - 256 * (bit_klen / 256)) / 8;
+		memcpy((K + 32 * (t - 1)), Ha, j);
+	}
+	else
+	{
+		memcpy((K + 32 * (t - 1)), Ha,32);
+	}
 
 	return 1;//返回1成功
 }
@@ -121,25 +186,28 @@ int KDF(unsigned Z[], int zlen, int klen, unsigned char K[])
 	输出：C密文
 	返回：0成功 !0失败
 */
-int SM2_encrypt(epoint* pubKey, unsigned char message[], int message_len, unsigned char C[])
+int SM2_encrypt(epoint* pubKey, unsigned char * message, int message_len, unsigned char C[])
 {
 	big k,C1x,C1y,x2,y2;  //k为随机数
 	epoint* C1, * kP, * S;
 	unsigned char x2y2_char[32 * 2] = { 0 };
+	int i = 0, j = 0;
+	sha256 sha_256;
 	k = mirvar(0);
 	C1x = mirvar(0);
 	C1y = mirvar(0);
 	x2 = mirvar(0);
 	y2 = mirvar(0);
-	C1 = epoint2_init();
-	kP = epoint2_init();
-	S = epoint2_init();
-	
+	C1 = epoint_init();
+	kP = epoint_init();
+	S = epoint_init();
+
 	//step 1:产生随机数k   在1至n-1的双侧闭区间
-	while (isInRange(k))
+	while (isInRange(k)==0)
 	{
 		bigrand(para_n, k); 
 	}
+
 	//step 2:计算椭圆曲线点C1 
 	ecurve_mult(k, G, C1);  //C1 = [k]G
 	epoint_get(C1, C1x,C1y);
@@ -148,8 +216,9 @@ int SM2_encrypt(epoint* pubKey, unsigned char message[], int message_len, unsign
 	big_to_bytes(32, C1y, C + 32, 1);
 
 	//step 3：计算曲线点S  并判断是否为无穷远点，若是报错退出。
+	bytes_to_big(32, SM2_h, para_h);
 	ecurve_mult(para_h, pubKey, S);
-	if (point_at_infinity)
+	if (point_at_infinity(S))
 	{
 		printf("S is not at infinity!\n");
 		return 0;
@@ -157,27 +226,50 @@ int SM2_encrypt(epoint* pubKey, unsigned char message[], int message_len, unsign
 
 	//step 4: 计算[k]PB = (x2, y2)，并将x2,y2转换成比特串
 	ecurve_mult(k, pubKey, kP);  //kP=[k]PB
-	ecurve_get(kP, x2, y2);
+	epoint_get(kP, x2, y2);
 	
 	big_to_bytes(32, x2, x2y2_char, 1);
 	big_to_bytes(32, y2, x2y2_char+32, 1);
 
-	//step 5:
-
-	/* test if the given array is all zero */
-	/*int Test_Null(unsigned char array[], int len)
+	//step 5: KDF 并判断是否全为0   
+	KDF(x2y2_char, 32 * 2, message_len, C + 32 * 3);
+	j = 32 * 3;
+	int flag = 0;//如果有不为0的 那么就不会全为0  标志位
+	for (i =0; i < message_len; i++,j++)
 	{
-		int i;
+		
+		if (C[j] != 0x00)
+		{
+			flag = 1;
+			break;
+		}
+	}
+	if (flag == 0)
+	{
+		printf("The C is  all zero\n");
+		return 0;
+	}
 
-		for (i = 0; i < len; i++)
-			if (array[i] != 0x00) return 0;
-
-		return 1;
-	}*/
-
-
+	//step 6:C2=M异或t
+	for (i = 0; i < message_len; i++)
+	{
+		C[32 * 3 + i] = message[i] ^ C[32 * 3 + i];
+	}
 
 
+	//step 7:计算C3
+	shs256_init(&sha_256);
+	for (j = 0; x2y2_char[j] != 0; j++)
+		shs256_process(&sha_256, x2y2_char[j]);
+	for (j = 0; message[j] != 0; j++)
+		shs256_process(&sha_256, message[j]);
+	
+	for (j = 32; x2y2_char[j] != 0; j++)
+		shs256_process(&sha_256, x2y2_char[j]);
 
+	shs256_hash(&sha_256, C + 32 * 2);
+
+	printf("encrypt done!\n");
+	return 1;	//成功返回1
 
 }
