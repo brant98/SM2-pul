@@ -78,7 +78,6 @@ int SM2_init(void)
 int isInRange(big num) //判断d是否在规定范围内  1至n-1的闭区间
 {
 	big one, decr_n;
-
 	one = mirvar(0);
 	decr_n = mirvar(0);
 
@@ -117,7 +116,7 @@ int KDF(unsigned char Z[], int zlen, int klen, unsigned char K[])
 	unsigned char Ha[32] = {0}; //摘要 及其长度为32
 	unsigned char ct[4] = { 0,0,0,1 };
 
-	bit_klen = klen * 8;//有多少位
+	bit_klen = klen * 8;//有多少位  也可以用字节。
 	sha256 sha_256;
 
 	if (bit_klen % 256)
@@ -277,7 +276,7 @@ int SM2_encrypt(epoint* pubKey, unsigned char* message, int message_len, unsigne
 	printf("encrypt C3:\n");
 	for (int pl = 0; pl < 32; pl++)
 	{
-		printf("%x", C[pl + 64]);
+		printf("%d", C[pl + 64]);
 	}
 	printf("\n\n");
 	return 1;	//成功返回1
@@ -292,7 +291,9 @@ int SM2_encrypt(epoint* pubKey, unsigned char* message, int message_len, unsigne
 int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message[])
 {
 	unsigned char x2y2[32 * 2] = { 0 };
-	unsigned char hash[32] = { 0 };
+	unsigned char hash[32] ;
+	memset(hash, 0, sizeof(char) * 4);
+//	memset(hash, 0, 32);
 	big C1x, C1y, x2, y2, xx, temp;//xx  temp 用于判断是否在椭圆曲线上
 	epoint* C1, * S, * dC1;
 	sha256 sha_256;
@@ -380,23 +381,24 @@ int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message[])
 	shs256_hash(&sha_256, hash);
 
 
-
 	printf("decrypt hash:\n");
 	for (int pl = 0; pl < 32; pl++)
 	{
-		printf("%0x", hash[pl]);
+		printf("%d", hash[pl]);
 	}
 	printf("\n");
+	int teddd = memcpy(hash, C + 32 * 2, 32);
+	printf("%d", teddd);
+	
 
-
-	if (memcpy(hash, C+32 * 2, 32) != 0)
+	if (memcmp(hash, C+32*2, 32) != 0) //这里花费了很长时间,还是不对。明明值是一样的哒 效果始终不对就换了一种方式。
 	{
-		printf("Decrypt failed!\n");
+		printf("!!!!!!!!!Decrypt failed!\n");
 	    return 0;
 	}
 	else
 	{
-	printf("SM2 decrypt done! The message is :\n");
+	printf("Successed!  SM2 decrypt done! \n");
 
 	}
 	return 1;
