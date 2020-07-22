@@ -232,9 +232,9 @@ int SM2_encrypt(epoint* pubKey, unsigned char* message, int message_len, unsigne
 
 	//step 5: KDF 并判断是否全为0   
 	KDF(x2y2_char, 32 * 2,  C + 32 * 3, message_len);
-
 	j = 32 * 3;
-	int flag = 0;//如果有不为0的 那么就不会全为0  标志位
+
+	int flag = 0;       //如果有不为0的 那么就不会全为0  标志位
 	for (i = 0; i < message_len; i++, j++)
 	{
 
@@ -244,6 +244,7 @@ int SM2_encrypt(epoint* pubKey, unsigned char* message, int message_len, unsigne
 			break;
 		}
 	}
+
 	if (flag == 0)
 	{
 		printf("The C is  all zero\n");
@@ -271,14 +272,6 @@ int SM2_encrypt(epoint* pubKey, unsigned char* message, int message_len, unsigne
 	shs256_hash(&sha_256, C + 32 * 2);
 
 	printf("SM2 encrypt done!\n");
-
-	//test
-	printf("encrypt C3:\n");
-	for (int pl = 0; pl < 32; pl++)
-	{
-		printf("%d", C[pl + 64]);
-	}
-	printf("\n\n");
 	return 1;	//成功返回1
 }
 
@@ -288,7 +281,7 @@ int SM2_encrypt(epoint* pubKey, unsigned char* message, int message_len, unsigne
 	输出：message明文
 	返回：1成功 0失败
 */
-int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message[])
+int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message_jiem[])
 {
 	unsigned char x2y2[32 * 2] = { 0 };
 	unsigned char hash[32] ;
@@ -342,13 +335,13 @@ int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message[])
 	big_to_bytes(32, y2, x2y2 + 32, 1);
 
 	//step 4:KDF  得到t  在message中
-	KDF(x2y2, 32 * 2,  message, Clen - 32 * 3);
+	KDF(x2y2, 32 * 2,  message_jiem, Clen-32 * 3);
 
 	int flag = 0;//如果有一个不为0的 那么就不会全为0。  标志位
 	for (i = 0; i < Clen - 32 * 3; i++)
 	{
 
-		if (message[j] != 0x00)
+		if (message_jiem[j] != 0x00)
 		{
 			flag = 1;
 			break;
@@ -363,7 +356,7 @@ int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message[])
 	//step 5: 计算M‘
 	for (i = 0; i < Clen - 32 * 3; i++)
 	{
-		message[i] = message[i] ^ C[32 * 3 + i];
+		message_jiem[i] = message_jiem[i] ^ C[32 * 3 + i];
 	}
 
 	//step 6:
@@ -372,24 +365,13 @@ int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message[])
 		shs256_process(&sha_256, x2y2[j]);
 	for (j = 0; j < Clen - 32 * 3; j++)
 	{
-		shs256_process(&sha_256, message[j]);
+		shs256_process(&sha_256, message_jiem[j]);
 	}
 	for (j = 32; j<64; j++)
 	{
 		shs256_process(&sha_256, x2y2[j]);
 	}
 	shs256_hash(&sha_256, hash);
-
-
-	printf("decrypt hash:\n");
-	for (int pl = 0; pl < 32; pl++)
-	{
-		printf("%d", hash[pl]);
-	}
-	printf("\n");
-	int teddd = memcpy(hash, C + 32 * 2, 32);
-	printf("%d", teddd);
-	
 
 	if (memcmp(hash, C+32*2, 32) != 0) //这里花费了很长时间,还是不对。明明值是一样的哒 效果始终不对就换了一种方式。
 	{

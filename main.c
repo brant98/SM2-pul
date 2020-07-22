@@ -17,20 +17,21 @@ int main(void)
 	clock_t start, finish;//计算运行时间用
 	start = clock();
 	int i = 0;
-	SM2_init();//初初始化椭圆曲线参数
-	SM2_creat_key(&d, &pub);//密钥生成
-
+	
 	for (i = 0; i < 1000; i++)
 	{
+		SM2_init();//初初始化椭圆曲线参数
+		SM2_creat_key(&d, &pub);//密钥生成
+		SM2_encrypt(pub, message, strlen(message), Cipher);
+	SM2_decrypt(d, Cipher, sizeof(Cipher), message_jiem);
 
 	}
-	SM2_encrypt(pub, message, strlen(message), Cipher);
-	SM2_decrypt(d, Cipher, sizeof(Cipher), message_jiem);
-	printf("After decrypting.The message is : ");
+	printf("After decrypting,the message is : ");
 	for(i=0;i<sizeof(message_jiem);i++)
-	printf("%c", message_jiem[i]);
+	printf("%c", message_jiem[i]); 
 
 
+	printf("\n\n");
 	finish = clock();
 	printf("Test of this algorithm finished\n");
 	printf("Start at  %f s\n", (double)start / CLOCKS_PER_SEC);
