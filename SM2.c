@@ -109,7 +109,7 @@ KDF密钥派生函数
 *Z是比特串，klen表示要获得的密钥数据的比特长度
 *k是存放输出的，z是输入
 */
-int KDF(unsigned char Z[], int zlen, int klen, unsigned char K[])
+int KDF(unsigned char Z[], int zlen, unsigned char K[],int klen)
 {
 	int  i, j=0, t;
 	int bit_klen;
@@ -231,7 +231,7 @@ int SM2_encrypt(epoint* pubKey, unsigned char* message, int message_len, unsigne
 	big_to_bytes(32, y2, x2y2_char + 32, 1);
 
 	//step 5: KDF 并判断是否全为0   
-	KDF(x2y2_char, 32 * 2, message_len, C + 32 * 3);
+	KDF(x2y2_char, 32 * 2,  C + 32 * 3, message_len);
 
 	j = 32 * 3;
 	int flag = 0;//如果有不为0的 那么就不会全为0  标志位
@@ -342,7 +342,7 @@ int SM2_decrypt(big d, unsigned char C[], int Clen, unsigned char message[])
 	big_to_bytes(32, y2, x2y2 + 32, 1);
 
 	//step 4:KDF  得到t  在message中
-	KDF(x2y2, 32 * 2, Clen-32 * 3, message);
+	KDF(x2y2, 32 * 2,  message, Clen - 32 * 3);
 
 	int flag = 0;//如果有一个不为0的 那么就不会全为0。  标志位
 	for (i = 0; i < Clen - 32 * 3; i++)

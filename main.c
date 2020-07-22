@@ -9,8 +9,9 @@ int main(void)
 	unsigned char* message = "Be there or be square!";
 	unsigned char message_jiem[22];//解密后的明文存放在这个里面
 	//int Cipher_len = strlen(message)+96;  这里密文长度不是动态的，后续还可以改进一下
-	unsigned char Cipher[118] = { 0 };
-	big d, pubx, puby;  //私钥
+	
+	unsigned char Cipher[118] = { 0 };//存放密文的，这里的话  总觉得明文长度会暴露？再看看
+	big d, pubx, puby;  //私钥和公钥点x,y
 	epoint* pub;//公钥
 
 	clock_t start, finish;//计算运行时间用
